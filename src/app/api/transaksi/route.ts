@@ -72,7 +72,7 @@ export async function POST(req: Request) {
 
     // Recalculate price from DB
     const { data: produk, error: produkError } = await supabaseAdmin.from('produk')
-      .select('harga_per_hari')
+      .select('harga_per_hari, nama, gambar_url')
       .eq('id', data.produk_id)
       .single();
 
@@ -122,6 +122,8 @@ export async function POST(req: Request) {
     const { data: newTransaksi, error: insertError } = await supabaseAdmin.from('transaksi')
       .insert({
         produk_id: data.produk_id,
+        produk_nama: produk.nama,
+        produk_gambar: produk.gambar_url?.[0] || '',
         nama_penyewa: namaPenyewa,
         no_hp_penyewa: encryptedHp,
         nik_penyewa: encryptedNik,
