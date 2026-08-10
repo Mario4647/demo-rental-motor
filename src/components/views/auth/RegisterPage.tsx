@@ -66,8 +66,13 @@ export function RegisterPage({
     }
 
     try {
+      // Validate using the frontend schema which expects namaLengkap, phone, confirmPassword
+      registerSchema.parse(formData);
+      setErrors({});
+      setIsLoading(true);
+      
       // Map frontend fields to backend schema expected fields
-      const dataToValidate = {
+      const dataToBackend = {
         email: formData.email,
         password: formData.password,
         nama_lengkap: formData.namaLengkap,
@@ -75,14 +80,10 @@ export function RegisterPage({
         no_hp: formData.phone,
       };
       
-      registerSchema.parse(dataToValidate);
-      setErrors({});
-      setIsLoading(true);
-      
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToValidate),
+        body: JSON.stringify(dataToBackend),
       });
       
       const data = await res.json();
@@ -103,11 +104,7 @@ export function RegisterPage({
         const errorsList = (err as any).issues || (err as any).errors || [];
         errorsList.forEach((e: any) => {
           if (e.path && e.path[0]) {
-            // Map backend schema field names back to frontend state names for error display
-            let fieldName = e.path[0];
-            if (fieldName === 'nama_lengkap') fieldName = 'namaLengkap';
-            if (fieldName === 'no_hp') fieldName = 'phone';
-            newErrors[fieldName] = e.message;
+            newErrors[e.path[0]] = e.message;
           }
         });
         setErrors(newErrors);
