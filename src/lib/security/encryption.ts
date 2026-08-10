@@ -1,11 +1,13 @@
 import crypto from 'crypto';
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '00000000000000000000000000000000'; // Fallback 32 bytes for safety
+// Ensure key is exactly 32 bytes long for aes-256-gcm by hashing it
+const KEY_BUFFER = crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest();
 const ALGORITHM = 'aes-256-gcm';
 
 export function encrypt(plaintext: string): string {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'utf-8'), iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, KEY_BUFFER, iv);
   
   let encrypted = cipher.update(plaintext, 'utf8', 'base64');
   encrypted += cipher.final('base64');
@@ -24,7 +26,7 @@ export function decrypt(encryptedData: string): string {
   const authTag = Buffer.from(parts[1], 'base64');
   const encrypted = parts[2];
   
-  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'utf-8'), iv);
+  const decipher = crypto.createDecipheriv(ALGORITHM, KEY_BUFFER, iv);
   decipher.setAuthTag(authTag);
   
   let decrypted = decipher.update(encrypted, 'base64', 'utf8');
