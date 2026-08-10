@@ -67,6 +67,9 @@ export async function POST(req: Request) {
     const supabase = await createClient();
     const supabaseAdmin = createServiceClient();
 
+    // Fallback nama_penyewa from auth profile if not provided or null
+    const namaPenyewa = data.nama_penyewa || auth.profile.nama_lengkap || auth.user.email || 'Penyewa';
+
     // Recalculate price from DB
     const { data: produk, error: produkError } = await supabaseAdmin.from('produk')
       .select('harga_per_hari')
@@ -89,8 +92,8 @@ export async function POST(req: Request) {
     const randomDigits = Math.floor(1000 + Math.random() * 9000);
     const invoiceId = `INV-${todayStr}-${randomDigits}`;
 
-    const encryptedNik = data.nik_penyewa ? encrypt(data.nik_penyewa) : auth.profile.nik;
-    const encryptedHp = data.no_hp_penyewa ? encrypt(data.no_hp_penyewa) : auth.profile.no_hp;
+    const encryptedNik = data.nik_penyewa ? encrypt(data.nik_penyewa) : (auth.profile.nik || '');
+    const encryptedHp = data.no_hp_penyewa ? encrypt(data.no_hp_penyewa) : (auth.profile.no_hp || '');
 
     let status = 'pending';
     let snapToken = null;
@@ -106,7 +109,7 @@ export async function POST(req: Request) {
         order_id: midtransOrderId,
         gross_amount: calculatedPrice,
         customer_details: {
-          first_name: data.nama_penyewa,
+          first_name: namaPenyewa,
           email: auth.user.email || '',
         }
       });
@@ -118,7 +121,10 @@ export async function POST(req: Request) {
 
     const { data: newTransaksi, error: insertError } = await supabaseAdmin.from('transaksi')
       .insert({
-        ...data,
+        produk_id: data.produk_id,
+        nama_penyewa: namaPenyewa,
+        no_hp_penyewa: encryptedHp,
+        nik_penyewa: encryptedNik,
         user_id: auth.user.id,
         invoice_id: invoiceId,
         tanggal_mulai_sewa: data.tanggal_mulai,
@@ -126,12 +132,12 @@ export async function POST(req: Request) {
         durasi_hari: data.durasi_hari,
         tanggal_selesai_sewa: tanggal_selesai_sewa,
         total_harga: calculatedPrice,
+        metode_pembayaran: data.metode_pembayaran,
+        lokasi_pengambilan: data.lokasi_pengambilan || '',
         status,
-        nik_penyewa: encryptedNik,
-        no_hp_penyewa: encryptedHp,
         snap_token: snapToken,
         midtrans_order_id: midtransOrderId,
-        payment_deadline: paymentDeadline,
+        payment_deadline_at: paymentDeadline,
       })
       .select()
       .single();

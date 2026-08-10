@@ -20,7 +20,7 @@ export const createUnitSchema = z.object({
 
 export const createTransaksiSchema = z.object({
   produk_id: z.string().uuid('Invalid Product ID'),
-  nama_penyewa: z.string().min(2, 'Name is required'),
+  nama_penyewa: z.string().nullable().optional(),
   no_hp_penyewa: z.string().optional(),
   nik_penyewa: z.string().optional(),
   tanggal_mulai: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
