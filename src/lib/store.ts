@@ -234,9 +234,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedProductDetail: (p) => set({ selectedProductDetail: p }),
 
   createTransaction: async (data) => {
+    // Map camelCase to snake_case for backend validation
+    const payload = {
+      produk_id: data.produkId,
+      nama_penyewa: data.namaPenyewa,
+      no_hp_penyewa: data.noHpPenyewa,
+      nik_penyewa: data.nikPenyewa,
+      tanggal_mulai: data.tanggalMulai,
+      jam_mulai: data.jamMulai,
+      durasi_hari: data.durasiHari,
+      metode_pembayaran: data.metodePembayaran,
+      lokasi_pengambilan: data.lokasiPengambilan || '',
+    };
+    
     const { data: result, error } = await apiFetch<{ data: Transaksi }>('/api/transaksi', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     if (result?.data) {
       set((state) => ({ transactions: [result.data, ...state.transactions] }));
