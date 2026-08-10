@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { Bike, Search, User, Menu, X, ShoppingBag } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { activeView, setActiveView, setActiveRole, cart } = useAppStore();
+  const { activeView, setActiveView, setAuthView, cart } = useAppStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNav = (view: string) => {
@@ -55,18 +55,18 @@ export const Navbar: React.FC = () => {
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
           <button
-            onClick={() => setActiveRole('user')}
+            onClick={() => setAuthView('login')}
             className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5"
           >
-            <User className="w-4 h-4" />
-            <span>Masuk / Daftar</span>
+            <User className="w-3.5 h-3.5" />
+            <span>Masuk</span>
           </button>
         </div>
 
         {/* Mobile Hamburger Button */}
         <div className="flex md:hidden items-center gap-2">
           <button
-            onClick={() => setActiveRole('user')}
+            onClick={() => setAuthView('login')}
             className="bg-purple-600 text-white p-2 rounded-xl text-xs font-bold"
           >
             <User className="w-4 h-4" />

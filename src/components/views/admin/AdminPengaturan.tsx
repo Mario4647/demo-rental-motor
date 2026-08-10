@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 export const AdminPengaturan: React.FC = () => {
-  const { appSettings, paymentSettings, toggleMaintenanceMode, addAuditLog, updateAppSettings } = useAppStore();
+  const { appSettings, paymentSettings, toggleMaintenanceMode, updateAppSettings } = useAppStore();
 
   const [activeTab, setActiveTab] = useState('Umum');
 

@@ -13,23 +13,28 @@ import {
 export const AdminDashboard: React.FC = () => {
   const { transactions, products, units, users } = useAppStore();
 
-  const [dateRange, setDateRange] = useState('21 Mei - 21 Jun 2024');
+  // Compute Dynamic Data
+  const totalPendapatan = transactions.reduce((acc, trx) => acc + (trx.total_harga || 0), 0);
+  const trxHariIni = transactions.filter(t => new Date(t.created_at || '').toDateString() === new Date().toDateString()).length;
+  
+  const unitDisewa = units.filter(u => u.status === 'disewa').length;
+  const totalUnit = units.length;
+  
+  const totalPelanggan = users.filter(u => u.role === 'user').length;
+  
+  const trxMenunggu = transactions.filter(t => t.status.toLowerCase().includes('menunggu')).length;
+  
+  const trxBerlangsung = transactions.filter(t => t.status === 'berlangsung').length;
 
-  // Chart Data matching Mockup 1
   const revenueData = [
-    { month: 'Jan', revenue: 45000000 },
-    { month: 'Feb', revenue: 52000000 },
-    { month: 'Mar', revenue: 68000000 },
-    { month: 'Apr', revenue: 74000000 },
-    { month: 'Mei', revenue: 95000000 },
-    { month: 'Jun', revenue: 128750000 },
+    { month: 'Bulan Ini', revenue: totalPendapatan }
   ];
 
   const statusDonutData = [
-    { name: 'Berlangsung', value: 32, color: '#7C3AED' },
-    { name: 'Menunggu', value: 14, color: '#F59E0B' },
-    { name: 'Selesai', value: 85, color: '#10B981' },
-    { name: 'Dibatalkan', value: 6, color: '#EF4444' },
+    { name: 'Berlangsung', value: trxBerlangsung, color: '#7C3AED' },
+    { name: 'Menunggu', value: trxMenunggu, color: '#F59E0B' },
+    { name: 'Selesai', value: transactions.filter(t => t.status === 'selesai').length, color: '#10B981' },
+    { name: 'Dibatalkan', value: transactions.filter(t => t.status === 'dibatalkan').length, color: '#EF4444' },
   ];
 
   return (
@@ -44,11 +49,11 @@ export const AdminDashboard: React.FC = () => {
 
         <div className="bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl text-xs text-slate-700 font-semibold flex items-center gap-2 self-start sm:self-auto">
           <Calendar className="w-4 h-4 text-purple-600" />
-          <span>{dateRange}</span>
+          <span>Real-time Data</span>
         </div>
       </div>
 
-      {/* 2. STATS GRID (Mockup 1 - 6 Cards Grid, 1 col mobile, 2 sm, 3 lg, 6 xl) */}
+      {/* 2. STATS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         
         {/* Card 1: Total Pendapatan */}
@@ -60,10 +65,9 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <div>
-            <div className="text-lg font-black text-slate-900 tracking-tight">Rp 128,75M</div>
+            <div className="text-lg font-black text-slate-900 tracking-tight">Rp {totalPendapatan.toLocaleString('id-ID')}</div>
             <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 mt-0.5">
-              <TrendingUp className="w-3 h-3" />
-              <span>+12.5% bln ini</span>
+              <span>Berdasarkan seluruh riwayat</span>
             </div>
           </div>
         </div>
@@ -77,11 +81,8 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <div>
-            <div className="text-lg font-black text-slate-900 tracking-tight">24</div>
-            <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 mt-0.5">
-              <TrendingUp className="w-3 h-3" />
-              <span>+8.2% vs kemarin</span>
-            </div>
+            <div className="text-lg font-black text-slate-900 tracking-tight">{trxHariIni}</div>
+            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">Transaksi masuk hari ini</div>
           </div>
         </div>
 
@@ -94,50 +95,50 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <div>
-            <div className="text-lg font-black text-slate-900 tracking-tight">32</div>
-            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">Dari 50 unit armada</div>
+            <div className="text-lg font-black text-slate-900 tracking-tight">{unitDisewa}</div>
+            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">Dari {totalUnit} unit armada</div>
           </div>
         </div>
 
-        {/* Card 4: Unit Tersedia */}
+        {/* Card 4: Total Pelanggan */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-2 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500">Unit Tersedia</span>
+            <span className="text-[11px] font-semibold text-slate-500">Total Pelanggan</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-lg font-black text-slate-900 tracking-tight">18</div>
-            <div className="text-[10px] font-semibold text-emerald-600 mt-0.5">Siap disewa sekarang</div>
-          </div>
-        </div>
-
-        {/* Card 5: User Terdaftar */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-2 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500">User Terdaftar</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-lg font-black text-slate-900 tracking-tight">142</div>
-            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">+15 user minggu ini</div>
+            <div className="text-lg font-black text-slate-900 tracking-tight">{totalPelanggan}</div>
+            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">Pengguna terdaftar</div>
           </div>
         </div>
 
-        {/* Card 6: Total Produk */}
+        {/* Card 5: Menunggu Bayar */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-2 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500">Total Produk</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Bike className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-slate-500">Menunggu Bayar</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-lg font-black text-slate-900 tracking-tight">24</div>
-            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">Kategori Matic & Sport</div>
+            <div className="text-lg font-black text-slate-900 tracking-tight">{trxMenunggu}</div>
+            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">Perlu tindak lanjut</div>
+          </div>
+        </div>
+
+        {/* Card 6: Batal/Refund */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-2 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-500">Batal / Refund</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <XCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-lg font-black text-slate-900 tracking-tight">{statusDonutData[3].value}</div>
+            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">Bulan ini</div>
           </div>
         </div>
 
@@ -154,7 +155,7 @@ export const AdminDashboard: React.FC = () => {
               <p className="text-xs text-slate-500">Pertumbuhan omzet bulanan dalam Rupiah</p>
             </div>
             <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-lg">
-              Total Rp 462,75M
+              Total Rp {totalPendapatan.toLocaleString('id-ID')}
             </span>
           </div>
 

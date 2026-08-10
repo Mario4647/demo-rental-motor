@@ -3,13 +3,20 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Produk, Transaksi } from '@/lib/types';
+import { createClient } from '@/lib/supabase/client';
+import { Loader2 } from 'lucide-react';
+
+// Auth Views
+import { LoginPage } from '@/components/views/auth/LoginPage';
+import { RegisterPage } from '@/components/views/auth/RegisterPage';
+import { ForgotPasswordPage } from '@/components/views/auth/ForgotPasswordPage';
 
 // Layouts
 import { Navbar } from '@/components/layout/Navbar';
 import { SidebarCustomer } from '@/components/layout/SidebarCustomer';
 import { SidebarAdmin } from '@/components/layout/SidebarAdmin';
 import { Footer } from '@/components/layout/Footer';
-import { RoleSwitcher } from '@/components/RoleSwitcher';
+
 
 // Views
 import { HomeView } from '@/components/views/HomeView';
@@ -36,23 +43,68 @@ import { AdminTransaksiPembayaran } from '@/components/views/admin/AdminTransaks
 import { AdminUsersManagement } from '@/components/views/admin/AdminUsersManagement';
 import { AdminLaporanAudit } from '@/components/views/admin/AdminLaporanAudit';
 import { AdminPengaturan } from '@/components/views/admin/AdminPengaturan';
+import { AdminRegisterStaff } from '@/components/views/admin/AdminRegisterStaff';
 
 export default function Page() {
   const { 
     activeRole, activeView, setActiveView, appSettings, 
-    activeMidtransTrx, setActiveMidtransTrx 
+    activeMidtransTrx, setActiveMidtransTrx,
+    authView, setAuthView
   } = useAppStore();
 
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<Produk | null>(null);
   const [selectedProductForBooking, setSelectedProductForBooking] = useState<Produk | null>(null);
   const [activeSuccessTrx, setActiveSuccessTrx] = useState<Transaksi | null>(null);
 
+  // Auth States
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const { setActiveRole } = useAppStore.getState();
+
+  React.useEffect(() => {
+    async function checkSession() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          // Fetch real user profile from API
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            setCurrentUser(data.profile);
+            setIsAuthenticated(true);
+            useAppStore.getState().setActiveRole(data.profile.role || 'user');
+            useAppStore.getState().setCurrentUser(data.profile);
+            useAppStore.getState().setIsAuthenticated(true);
+          }
+        }
+      } catch (err) {
+        console.error("Session check failed", err);
+      } finally {
+        setIsLoading(false);
+        useAppStore.getState().setIsAuthLoading(false);
+      }
+    }
+    
+    checkSession();
+    
+    // Fetch global application data from backend
+    const store = useAppStore.getState();
+    store.fetchProducts();
+    store.fetchUnits();
+    store.fetchTransactions();
+    store.fetchSettings();
+  }, []);
+
   // 1. Maintenance Mode Override for Guest & Customer Users
   if (appSettings.maintenance_mode && (activeRole === 'guest' || activeRole === 'user')) {
     return (
       <main>
         <MaintenanceView />
-        <RoleSwitcher />
+        
       </main>
     );
   }
@@ -62,6 +114,24 @@ export default function Page() {
     setActiveSuccessTrx(trx);
     setActiveView('success-qr');
   };
+
+  const handleLoginSuccess = (user: any) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setAuthView(null);
+    const role = user.role || 'user';
+    useAppStore.getState().setActiveRole(role);
+    useAppStore.getState().setCurrentUser(user);
+    useAppStore.getState().setIsAuthenticated(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f6f6fb] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-violet-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f6fb] text-slate-900 flex flex-col font-sans">
@@ -74,19 +144,46 @@ export default function Page() {
           <Navbar />
           
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-            {activeView === 'success-qr' && activeSuccessTrx ? (
+            {authView === 'login' ? (
+              <LoginPage 
+                onSwitch={() => setAuthView('register')} 
+                onForgotPassword={() => setAuthView('forgot-password')} 
+                onLoginSuccess={handleLoginSuccess} 
+              />
+            ) : authView === 'register' ? (
+              <RegisterPage 
+                onSwitch={() => setAuthView('login')} 
+                onRegisterSuccess={() => setAuthView('login')} 
+              />
+            ) : authView === 'forgot-password' ? (
+              <ForgotPasswordPage 
+                onBack={() => setAuthView('login')} 
+              />
+            ) : activeView === 'success-qr' && activeSuccessTrx ? (
               <SuccessQRView transaction={activeSuccessTrx} />
             ) : activeView === 'katalog' ? (
               <KatalogView
                 onSelectProduct={(p) => setSelectedProductForDetail(p)}
-                onBookProduct={(p) => setSelectedProductForBooking(p)}
+                onBookProduct={(p) => {
+                  if (isAuthenticated) {
+                    setSelectedProductForBooking(p);
+                  } else {
+                    setAuthView('login');
+                  }
+                }}
               />
             ) : activeView === 'keranjang' || activeView === 'riwayat' ? (
               <RiwayatView onViewSuccessQR={(t) => { setActiveSuccessTrx(t); setActiveView('success-qr'); }} />
             ) : (
               <HomeView
                 onSelectProduct={(p) => setSelectedProductForDetail(p)}
-                onBookProduct={(p) => setSelectedProductForBooking(p)}
+                onBookProduct={(p) => {
+                  if (isAuthenticated) {
+                    setSelectedProductForBooking(p);
+                  } else {
+                    setAuthView('login');
+                  }
+                }}
               />
             )}
           </main>
@@ -161,6 +258,8 @@ export default function Page() {
               <AdminLaporanAudit />
             ) : activeView === 'admin-pengaturan' ? (
               <AdminPengaturan />
+            ) : activeView === 'admin-register-staff' ? (
+              <AdminRegisterStaff />
             ) : (
               <AdminDashboard />
             )}
@@ -187,7 +286,7 @@ export default function Page() {
         onSuccess={handleBookingSuccess}
       />
 
-      <RoleSwitcher />
+      
 
     </div>
   );

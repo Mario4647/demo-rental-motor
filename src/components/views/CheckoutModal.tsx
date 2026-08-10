@@ -15,9 +15,7 @@ interface CheckoutModalProps {
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ product, onClose, onSuccess }) => {
-  const { createTransaction, appSettings, users, setActiveMidtransTrx } = useAppStore();
-
-  const currentUser = users.find(u => u.role === 'user') || users[2];
+  const { createTransaction, appSettings, currentUser, setActiveMidtransTrx } = useAppStore();
 
   const [durasiHari, setDurasiHari] = useState(2);
   const [tanggalMulai, setTanggalMulai] = useState('2026-08-11');
@@ -45,15 +43,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ product, onClose, 
 
   const totalHarga = product.harga_per_hari * durasiHari;
 
-  const handleSubmitBooking = (e: React.FormEvent) => {
+  const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agreeKtp) return;
+    if (!agreeKtp || !currentUser) {
+      alert("Anda harus login untuk melakukan pemesanan.");
+      return;
+    }
 
-    const newTrx = createTransaction({
+    const newTrx = await createTransaction({
       produkId: product.id,
       namaPenyewa: currentUser.nama_lengkap,
       noHpPenyewa: currentUser.no_hp,
-      nikPenyewa: currentUser.nik,
+      nikPenyewa: currentUser.nik || '',
       tanggalMulai,
       jamMulai,
       durasiHari,
@@ -63,6 +64,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ product, onClose, 
 
     onClose();
     
+    if (!newTrx) {
+      alert("Gagal membuat transaksi");
+      return;
+    }
+
     if (metodePembayaran === 'midtrans') {
       // Trigger Midtrans Snap Popup Simulation Modal!
       setActiveMidtransTrx(newTrx);
@@ -121,9 +127,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ product, onClose, 
                   <span>Informasi Penyewa (Auto-fill)</span>
                 </h4>
                 <div className="text-xs space-y-1 text-slate-600">
-                  <p><span className="font-semibold text-slate-800">Nama Lengkap:</span> {currentUser.nama_lengkap}</p>
-                  <p><span className="font-semibold text-slate-800">No. WhatsApp:</span> {currentUser.no_hp}</p>
-                  <p><span className="font-semibold text-slate-800">NIK (Enkripsi PII):</span> 317109******0003</p>
+                  <p><span className="font-semibold text-slate-800">Nama Lengkap:</span> {currentUser?.nama_lengkap || '-'}</p>
+                  <p><span className="font-semibold text-slate-800">No. WhatsApp:</span> {currentUser?.no_hp || '-'}</p>
+                  <p><span className="font-semibold text-slate-800">NIK (Enkripsi PII):</span> {currentUser?.nik || '***'}</p>
                 </div>
               </div>
 

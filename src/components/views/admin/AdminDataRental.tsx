@@ -13,14 +13,14 @@ export const AdminDataRental: React.FC = () => {
   const [karyawanFilter, setKaryawanFilter] = useState('Semua Karyawan');
   const [selectedTrxDetail, setSelectedTrxDetail] = useState<Transaksi | null>(null);
 
-  const mockTableData = [
-    { invoice: 'INV-20240621-0001', penyewa: 'Budi Santoso', unit: 'Vario 125', mulai: '21 Jun 2024', durasi: '3 Hari', total: 'Rp 450.000', status: 'Berlangsung', badgeClass: 'bg-purple-100 text-purple-700' },
-    { invoice: 'INV-20240621-0002', penyewa: 'Andi Wijaya', unit: 'Beat 2023', mulai: '21 Jun 2024', durasi: '2 Hari', total: 'Rp 300.000', status: 'Menunggu', badgeClass: 'bg-amber-100 text-amber-700' },
-    { invoice: 'INV-20240620-0003', penyewa: 'Siti Rahma', unit: 'NMAX 155', mulai: '20 Jun 2024', durasi: '5 Hari', total: 'Rp 900.000', status: 'Selesai', badgeClass: 'bg-emerald-100 text-emerald-700' },
-    { invoice: 'INV-20240620-0004', penyewa: 'Budi Hermawan', unit: 'PCX 160', mulai: '20 Jun 2024', durasi: '3 Hari', total: 'Rp 550.000', status: 'Berlangsung', badgeClass: 'bg-purple-100 text-purple-700' },
-    { invoice: 'INV-20240620-0005', penyewa: 'Diki Prakoso', unit: 'Vario 160', mulai: '20 Jun 2024', durasi: '2 Hari', total: 'Rp 400.000', status: 'Selesai', badgeClass: 'bg-emerald-100 text-emerald-700' },
-    { invoice: 'INV-20240620-0006', penyewa: 'Maya Sari', unit: 'Scoopy', mulai: '19 Jun 2024', durasi: '1 Hari', total: 'Rp 150.000', status: 'Dibatalkan', badgeClass: 'bg-rose-100 text-rose-700' },
-  ];
+  const filteredTransactions = transactions.filter(t => {
+    const matchesSearch = 
+      t.invoice_id?.toLowerCase().includes(search.toLowerCase()) || 
+      t.nama_penyewa?.toLowerCase().includes(search.toLowerCase()) || 
+      t.no_hp_penyewa?.includes(search);
+    const matchesStatus = statusFilter === 'Semua Status' || t.status === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="space-y-6 pb-12">
@@ -57,7 +57,7 @@ export const AdminDataRental: React.FC = () => {
             >
               <option value="Semua Status">Semua Status</option>
               <option value="Berlangsung">Berlangsung</option>
-              <option value="Menunggu">Menunggu</option>
+              <option value="Menunggu">Menunggu_pembayaran</option>
               <option value="Selesai">Selesai</option>
               <option value="Dibatalkan">Dibatalkan</option>
             </select>
@@ -75,62 +75,66 @@ export const AdminDataRental: React.FC = () => {
         </div>
 
         {/* Action button */}
-        <button
-          onClick={() => setSelectedTrxDetail(transactions[0])}
-          className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition-colors flex items-center justify-center gap-2 shrink-0"
-        >
+        <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-purple-200">
           <Plus className="w-4 h-4" />
-          <span>+ Tambah Rental</span>
+          <span>Sewa Manual (Walk-in)</span>
         </button>
       </div>
 
-      {/* Main Table Container */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        
-        {/* Desktop Table View */}
+      {/* Table Container */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left text-slate-600">
-            <thead className="text-[11px] text-slate-400 font-semibold bg-slate-50 border-b border-slate-100">
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
               <tr>
-                <th className="px-4 py-3">Invoice</th>
-                <th className="px-4 py-3">Penyewa</th>
-                <th className="px-4 py-3">Unit</th>
-                <th className="px-4 py-3">Mulai</th>
-                <th className="px-4 py-3">Durasi</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
+                <th className="px-5 py-4 font-semibold">Invoice & Penyewa</th>
+                <th className="px-5 py-4 font-semibold">Unit & Durasi</th>
+                <th className="px-5 py-4 font-semibold">Total Biaya</th>
+                <th className="px-5 py-4 font-semibold">Status</th>
+                <th className="px-5 py-4 font-semibold text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {mockTableData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-50">
-                  <td 
-                    onClick={() => setSelectedTrxDetail(transactions[0])}
-                    className="px-4 py-3.5 font-bold text-purple-600 hover:underline cursor-pointer font-mono"
-                  >
-                    {row.invoice}
+            <tbody className="divide-y divide-slate-100">
+              {filteredTransactions.map((trx, i) => (
+                <tr key={trx.id || i} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-5 py-3">
+                    <div className="font-bold text-indigo-600 mb-0.5">{trx.invoice_id}</div>
+                    <div className="font-medium text-slate-900">{trx.nama_penyewa}</div>
+                    <div className="text-[10px] text-slate-500">{trx.no_hp_penyewa}</div>
                   </td>
-                  <td className="px-4 py-3.5 font-semibold text-slate-900">{row.penyewa}</td>
-                  <td className="px-4 py-3.5 text-slate-700">{row.unit}</td>
-                  <td className="px-4 py-3.5 text-slate-600">{row.mulai}</td>
-                  <td className="px-4 py-3.5 text-slate-600">{row.durasi}</td>
-                  <td className="px-4 py-3.5 font-bold text-slate-900">{row.total}</td>
-                  <td className="px-4 py-3.5">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${row.badgeClass}`}>
-                      {row.status}
+                  <td className="px-5 py-3">
+                    <div className="font-bold text-slate-800">{trx.produk_nama}</div>
+                    <div className="text-[10px] text-slate-500">{trx.tanggal_mulai_sewa} ({trx.durasi_hari} Hari)</div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="font-bold text-slate-900">Rp {trx.total_harga?.toLocaleString('id-ID')}</div>
+                    <div className="text-[10px] text-slate-500">{trx.metode_pembayaran}</div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-md font-bold text-[10px] capitalize">
+                      {trx.status.replace('_', ' ')}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <button 
-                      onClick={() => setSelectedTrxDetail(transactions[0])}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+                  <td className="px-5 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button 
+                        onClick={() => setSelectedTrxDetail(trx)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Lihat Detail"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {filteredTransactions.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
+                    Tidak ada data transaksi yang ditemukan
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

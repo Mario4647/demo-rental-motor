@@ -138,3 +138,29 @@ export interface PengaturanPayment {
   is_sandbox: boolean;
   is_active: boolean;
 }
+
+// Auth types for Supabase integration
+export interface AuthUser {
+  id: string;
+  email: string;
+  nama_lengkap: string;
+  role: Role;
+  avatar_url?: string;
+  is_active: boolean;
+}
+
+export type AuthView = 'login' | 'register' | 'forgot-password' | null;
+
+export interface DbProfile {
+  id: string;
+  email: string;
+  nama_lengkap: string;
+  nik: string; // encrypted in DB
+  no_hp: string; // encrypted in DB
+  role: Role;
+  avatar_url?: string;
+  is_active: boolean;
+  mfa_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}

@@ -7,10 +7,8 @@ import {
 } from 'lucide-react';
 
 export const SidebarCustomer: React.FC = () => {
-  const { activeView, setActiveView, setActiveRole, users } = useAppStore();
+  const { activeView, setActiveView, currentUser, logout } = useAppStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  const currentUser = users.find(u => u.role === 'user') || users[2];
 
   const handleNavClick = (view: string) => {
     setActiveView(view);
@@ -84,13 +82,13 @@ export const SidebarCustomer: React.FC = () => {
           {/* User Profile Card */}
           <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-2xl mb-5 flex items-center gap-3">
             <img 
-              src={currentUser.avatar_url || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80'} 
-              alt={currentUser.nama_lengkap} 
+              src={currentUser?.avatar_url || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80'} 
+              alt={currentUser?.nama_lengkap || 'Guest'} 
               className="w-9 h-9 rounded-full object-cover border border-purple-200 shrink-0"
             />
             <div className="overflow-hidden min-w-0">
-              <h4 className="text-xs font-bold text-slate-900 truncate">{currentUser.nama_lengkap}</h4>
-              <span className="text-[10px] text-slate-500 truncate block">{currentUser.email}</span>
+              <h4 className="text-xs font-bold text-slate-900 truncate">{currentUser?.nama_lengkap || 'Guest User'}</h4>
+              <span className="text-[10px] text-slate-500 truncate block">{currentUser?.email || 'Login to rent'}</span>
             </div>
           </div>
 
@@ -124,7 +122,7 @@ export const SidebarCustomer: React.FC = () => {
         <div className="pt-4 border-t border-slate-100">
           <button
             onClick={() => {
-              setActiveRole('guest');
+              logout();
               setIsMobileOpen(false);
             }}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"

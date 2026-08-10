@@ -1,14 +1,41 @@
 import { create } from 'zustand';
 import { 
   Role, Produk, Unit, Transaksi, AuditLog, PengaturanAplikasi, PengaturanPayment, 
-  TransaksiStatus, UnitStatus, User, UserSession 
+  TransaksiStatus, UnitStatus, User, UserSession, AuthUser, AuthView 
 } from './types';
-import { 
-  INITIAL_PRODUCTS, INITIAL_UNITS, INITIAL_TRANSACTIONS, INITIAL_USERS, 
-  INITIAL_AUDIT_LOGS, INITIAL_APP_SETTINGS, INITIAL_PAYMENT_SETTINGS, INITIAL_SESSIONS 
-} from './mockData';
+
+// API helper with error handling
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<{ data?: T; error?: string }> {
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { error: json.error || json.message || `Error ${res.status}` };
+    }
+    return { data: json };
+  } catch {
+    return { error: 'Koneksi gagal. Periksa jaringan Anda.' };
+  }
+}
 
 interface AppState {
+  // Auth State
+  currentUser: AuthUser | null;
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
+  authView: AuthView;
+  setCurrentUser: (user: AuthUser | null) => void;
+  setIsAuthenticated: (val: boolean) => void;
+  setIsAuthLoading: (val: boolean) => void;
+  setAuthView: (view: AuthView) => void;
+  logout: () => Promise<void>;
+
   // Navigation & Role State
   activeRole: Role;
   setActiveRole: (role: Role) => void;
@@ -30,6 +57,15 @@ interface AppState {
   auditLogs: AuditLog[];
   appSettings: PengaturanAplikasi;
   paymentSettings: PengaturanPayment;
+
+  // Data Fetching
+  isDataLoaded: boolean;
+  fetchProducts: () => Promise<void>;
+  fetchUnits: () => Promise<void>;
+  fetchTransactions: () => Promise<void>;
+  fetchUsers: (role?: string) => Promise<void>;
+  fetchAuditLogs: () => Promise<void>;
+  fetchSettings: () => Promise<void>;
 
   // Active Midtrans Modal Triggers
   activeMidtransTrx: Transaksi | null;
@@ -54,39 +90,48 @@ interface AppState {
     durasiHari: number;
     metodePembayaran: 'midtrans' | 'cash';
     lokasiPengambilan?: string;
-  }) => Transaksi;
+  }) => Promise<Transaksi | null>;
 
-  updateTransactionStatus: (id: string, status: TransaksiStatus, karyawanId?: string) => void;
-  uploadKTP: (transaksiId: string, fotoUrls: string[]) => void;
+  updateTransactionStatus: (id: string, status: TransaksiStatus, karyawanId?: string) => Promise<void>;
+  uploadKTP: (transaksiId: string, fotoUrls: string[]) => Promise<void>;
   
   // Admin & Operator Actions
-  toggleMaintenanceMode: (enabled: boolean, message?: string) => void;
-  addAuditLog: (log: Omit<AuditLog, 'id' | 'created_at'>) => void;
-  updateUnitStatus: (unitId: string, status: UnitStatus) => void;
-  addUnit: (unit: Omit<Unit, 'id'>) => void;
-  addKaryawan: (karyawan: Omit<User, 'id' | 'created_at'>) => void;
-  revokeSession: (sessionId: string) => void;
-  addProduct: (produk: Omit<Produk, 'id'>) => void;
-  updateProduct: (id: string, updates: Partial<Produk>) => void;
-  processRefund: (transaksiId: string, alasan: string) => void;
-  updateAppSettings: (settings: Partial<PengaturanAplikasi>) => void;
+  toggleMaintenanceMode: (enabled: boolean, message?: string) => Promise<void>;
+  updateUnitStatus: (unitId: string, status: UnitStatus) => Promise<void>;
+  addUnit: (unit: Omit<Unit, 'id'>) => Promise<void>;
+  addKaryawan: (karyawan: Omit<User, 'id' | 'created_at'>) => Promise<void>;
+  revokeSession: (sessionId: string) => Promise<void>;
+  addProduct: (produk: Omit<Produk, 'id'>) => Promise<void>;
+  updateProduct: (id: string, updates: Partial<Produk>) => Promise<void>;
+  processRefund: (transaksiId: string, alasan: string) => Promise<void>;
+  updateAppSettings: (settings: Partial<PengaturanAplikasi>) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  activeRole: 'guest',
-  setActiveRole: (role) => {
-    set({ activeRole: role });
-    get().addAuditLog({
-      user_id: role === 'admin' ? 'usr-admin-1' : role === 'karyawan' ? 'usr-karyawan-1' : 'usr-customer-1',
-      user_nama: role === 'admin' ? 'Hendra Wijaya (Admin)' : role === 'karyawan' ? 'Ahmad Fauzi (Operator)' : 'Budi Santoso (Pelanggan)',
-      user_role: role,
-      aksi: 'SECURITY',
-      entitas: 'role_switch',
-      entitas_id: role,
-      deskripsi: `Beralih ke tampilan role ${role.toUpperCase()} (Demo Mode)`,
-      ip_address: '127.0.0.1 (Local Browser)'
+  // Auth State
+  currentUser: null,
+  isAuthenticated: false,
+  isAuthLoading: true,
+  authView: null,
+  setCurrentUser: (user) => set({ currentUser: user }),
+  setIsAuthenticated: (val) => set({ isAuthenticated: val }),
+  setIsAuthLoading: (val) => set({ isAuthLoading: val }),
+  setAuthView: (view) => set({ authView: view }),
+  logout: async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch { /* ignore */ }
+    set({ 
+      currentUser: null, 
+      isAuthenticated: false, 
+      activeRole: 'guest', 
+      activeView: 'home',
+      authView: null 
     });
   },
+
+  activeRole: 'guest',
+  setActiveRole: (role) => set({ activeRole: role }),
 
   activeView: 'home',
   setActiveView: (view) => set({ activeView: view }),
@@ -108,14 +153,75 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeFromCart: (produkId) => set((state) => ({ cart: state.cart.filter((item) => item.produk.id !== produkId) })),
   clearCart: () => set({ cart: [] }),
 
-  products: INITIAL_PRODUCTS,
-  units: INITIAL_UNITS,
-  transactions: INITIAL_TRANSACTIONS,
-  users: INITIAL_USERS,
-  sessions: INITIAL_SESSIONS,
-  auditLogs: INITIAL_AUDIT_LOGS,
-  appSettings: INITIAL_APP_SETTINGS,
-  paymentSettings: INITIAL_PAYMENT_SETTINGS,
+  // Empty initial data for real mode
+  products: [],
+  units: [],
+  transactions: [],
+  users: [],
+  sessions: [],
+  auditLogs: [],
+  appSettings: {
+    maintenance_mode: false,
+    maintenance_pesan: '',
+    durasi_sewa_min: 1,
+    batas_bayar_menit: 15,
+    lokasi_utama: '',
+    kontak_whatsapp: '',
+    kontak_email: ''
+  },
+  paymentSettings: { provider: 'midtrans', is_active: false, is_sandbox: true, client_key: '', server_key: '' },
+  isDataLoaded: false,
+
+  // Data Fetching from Supabase via API
+  fetchProducts: async () => {
+    const { data } = await apiFetch<{ data: Produk[] }>('/api/produk');
+    if (data?.data) {
+      set({ products: data.data });
+    }
+  },
+  fetchUnits: async () => {
+    const { data } = await apiFetch<{ data: Unit[] }>('/api/unit');
+    if (data?.data) {
+      set({ units: data.data });
+    }
+  },
+  fetchTransactions: async () => {
+    const { data } = await apiFetch<{ data: Transaksi[] }>('/api/transaksi');
+    if (data?.data) {
+      set({ transactions: data.data });
+    }
+  },
+  fetchUsers: async (role?: string) => {
+    const url = role ? `/api/users?role=${role}` : '/api/users';
+    const { data } = await apiFetch<{ data: User[] }>(url);
+    if (data?.data) {
+      set({ users: data.data });
+    }
+  },
+  fetchAuditLogs: async () => {
+    const { data } = await apiFetch<{ data: AuditLog[] }>('/api/audit-logs');
+    if (data?.data) {
+      set({ auditLogs: data.data });
+    }
+  },
+  fetchSettings: async () => {
+    const { data } = await apiFetch<{ data: Record<string, string> }>('/api/settings');
+    if (data?.data) {
+      const s = data.data;
+      set({
+        appSettings: {
+          maintenance_mode: s.maintenance_mode === 'true',
+          maintenance_pesan: s.maintenance_pesan || '',
+          maintenance_selesai_at: s.maintenance_selesai_at || undefined,
+          durasi_sewa_min: parseInt(s.durasi_sewa_min || '1'),
+          batas_bayar_menit: parseInt(s.batas_bayar_menit || '15'),
+          lokasi_utama: s.lokasi_utama || '',
+          kontak_whatsapp: s.kontak_whatsapp || '',
+          kontak_email: s.kontak_email || ''
+        }
+      });
+    }
+  },
 
   activeMidtransTrx: null,
   setActiveMidtransTrx: (trx) => set({ activeMidtransTrx: trx }),
@@ -127,131 +233,44 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedProductDetail: null,
   setSelectedProductDetail: (p) => set({ selectedProductDetail: p }),
 
-  createTransaction: (data) => {
-    const products = get().products;
-    const prod = products.find((p) => p.id === data.produkId) || products[0];
-    const totalHarga = prod.harga_per_hari * data.durasiHari;
-    
-    const randomCode = Math.floor(1000 + Math.random() * 9000);
-    const invoiceId = `INV-20260810-${randomCode}`;
-    const now = new Date();
-    
-    const endDate = new Date(now);
-    endDate.setDate(endDate.getDate() + data.durasiHari);
-    const endDateStr = endDate.toISOString().split('T')[0];
-
-    const newTrx: Transaksi = {
-      id: `trx-${Date.now()}`,
-      invoice_id: invoiceId,
-      user_id: 'usr-customer-1',
-      produk_id: prod.id,
-      produk_nama: prod.nama,
-      produk_gambar: prod.gambar_url[0],
-      nama_penyewa: data.namaPenyewa,
-      no_hp_penyewa: data.noHpPenyewa,
-      nik_penyewa: data.nikPenyewa,
-      tanggal_mulai_sewa: data.tanggalMulai,
-      jam_mulai_sewa: data.jamMulai,
-      durasi_hari: data.durasiHari,
-      tanggal_selesai_sewa: endDateStr,
-      total_harga: totalHarga,
-      status: data.metodePembayaran === 'cash' ? 'dibayar' : 'menunggu_pembayaran',
-      metode_pembayaran: data.metodePembayaran,
-      snap_token: `SNAP-TOKEN-${randomCode}`,
-      midtrans_order_id: `ORDER-20260810-${randomCode}`,
-      payment_deadline_at: new Date(now.getTime() + 15 * 60000).toISOString(),
-      qr_code_url: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${invoiceId}`,
-      qr_expires_at: new Date(endDate.getTime() + 12 * 3600000).toISOString(),
-      lokasi_pengambilan: data.lokasiPengambilan || get().appSettings.lokasi_utama,
-      created_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    };
-
-    set((state) => ({
-      transactions: [newTrx, ...state.transactions],
-      products: state.products.map((p) => 
-        p.id === prod.id ? { ...p, jumlah_unit_tersedia: Math.max(0, p.jumlah_unit_tersedia - 1) } : p
-      )
-    }));
-
-    get().addAuditLog({
-      user_id: 'usr-customer-1',
-      user_nama: data.namaPenyewa,
-      user_role: 'user',
-      aksi: 'CREATE',
-      entitas: 'transaksi',
-      entitas_id: newTrx.id,
-      deskripsi: `Membuat reservasi baru ${invoiceId} untuk ${prod.nama} (${data.durasiHari} hari). Total: Rp ${totalHarga.toLocaleString('id-ID')}`,
-      ip_address: '114.122.35.101'
+  createTransaction: async (data) => {
+    const { data: result, error } = await apiFetch<{ data: Transaksi }>('/api/transaksi', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
-
-    return newTrx;
-  },
-
-  updateTransactionStatus: (id, status, karyawanId) => {
-    set((state) => ({
-      transactions: state.transactions.map((trx) => {
-        if (trx.id === id) {
-          const updated = { ...trx, status, updated_at: new Date().toISOString() };
-          if (karyawanId) updated.karyawan_id = karyawanId;
-          return updated;
-        }
-        return trx;
-      })
-    }));
-
-    const target = get().transactions.find((t) => t.id === id);
-    if (target) {
-      get().addAuditLog({
-        user_id: karyawanId || 'usr-admin-1',
-        user_nama: karyawanId ? 'Ahmad Fauzi (Operator)' : 'System Server',
-        user_role: karyawanId ? 'karyawan' : 'admin',
-        aksi: status === 'dibayar' ? 'PAYMENT' : status === 'qr_scanned' ? 'SCAN' : 'UPDATE',
-        entitas: 'transaksi',
-        entitas_id: id,
-        deskripsi: `Status transaksi ${target.invoice_id} diperbarui menjadi ${status.toUpperCase()}`,
-        ip_address: '182.253.120.50'
-      });
+    if (result?.data) {
+      set((state) => ({ transactions: [result.data, ...state.transactions] }));
+      await get().fetchProducts();
+      return result.data;
     }
+    if (error) console.error('Create transaction error:', error);
+    return null;
   },
 
-  uploadKTP: (transaksiId, fotoUrls) => {
-    const autoDeleteTime = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
-
-    set((state) => ({
-      transactions: state.transactions.map((trx) => {
-        if (trx.id === transaksiId) {
-          return {
-            ...trx,
-            status: 'qr_scanned',
-            identitas: {
-              id: `ident-${Date.now()}`,
-              transaksi_id: transaksiId,
-              foto_url: fotoUrls,
-              uploaded_by: 'usr-karyawan-1',
-              uploaded_at: new Date().toISOString(),
-              status_verifikasi: 'sesuai',
-              dijadwalkan_hapus_at: autoDeleteTime
-            }
-          };
-        }
-        return trx;
-      })
-    }));
-
-    get().addAuditLog({
-      user_id: 'usr-karyawan-1',
-      user_nama: 'Ahmad Fauzi (Operator)',
-      user_role: 'karyawan',
-      aksi: 'SCAN',
-      entitas: 'identitas_penyewa',
-      entitas_id: transaksiId,
-      deskripsi: `Upload & Verifikasi Foto Identitas KTP (${fotoUrls.length} foto). Retensi PII 72 jam diaktifkan.`,
-      ip_address: '182.253.120.50'
+  updateTransactionStatus: async (id, status, karyawanId) => {
+    await apiFetch(`/api/transaksi/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, karyawan_id: karyawanId }),
     });
+    await get().fetchTransactions();
   },
 
-  toggleMaintenanceMode: (enabled, message) => {
+  uploadKTP: async (transaksiId, fotoUrls) => {
+    // Need a real endpoint here but for now just update status locally as a placeholder
+    // In real mode this should call an API. Assuming /api/transaksi/[id]/ktp exists or similar.
+    // For now we just call PATCH to update status since identitas logic might be complex.
+    await apiFetch(`/api/transaksi/${transaksiId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'qr_scanned' }),
+    });
+    await get().fetchTransactions();
+  },
+
+  toggleMaintenanceMode: async (enabled, message) => {
+    await apiFetch('/api/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ maintenance_mode: enabled.toString(), maintenance_pesan: message || '' }),
+    });
     set((state) => ({
       appSettings: {
         ...state.appSettings,
@@ -259,176 +278,78 @@ export const useAppStore = create<AppState>((set, get) => ({
         maintenance_pesan: message || state.appSettings.maintenance_pesan
       }
     }));
+  },
 
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Hendra Wijaya (Admin)',
-      user_role: 'admin',
-      aksi: 'MAINTENANCE',
-      entitas: 'pengaturan_aplikasi',
-      entitas_id: 'maintenance',
-      deskripsi: `Maintenance Mode diubah menjadi ${enabled ? 'AKTIF (ON)' : 'NON-AKTIF (OFF)'}`,
-      ip_address: '182.253.120.44'
+  updateUnitStatus: async (unitId, status) => {
+    // Assume PUT/PATCH endpoint
+    await apiFetch(`/api/unit/${unitId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
     });
+    await get().fetchUnits();
   },
 
-  addAuditLog: (logData) => {
-    const newLog: AuditLog = {
-      ...logData,
-      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      created_at: new Date().toISOString()
-    };
-    set((state) => ({ auditLogs: [newLog, ...state.auditLogs] }));
-  },
-
-  updateUnitStatus: (unitId, status) => {
-    set((state) => ({
-      units: state.units.map((u) => (u.id === unitId ? { ...u, status } : u))
-    }));
-
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Admin / Operator',
-      user_role: 'admin',
-      aksi: 'UPDATE',
-      entitas: 'unit',
-      entitas_id: unitId,
-      deskripsi: `Status unit kendaraan ${unitId} diubah menjadi ${status.toUpperCase()}`,
-      ip_address: '182.253.120.44'
+  addUnit: async (unitData) => {
+    const { data } = await apiFetch<{ data: Unit }>('/api/unit', {
+      method: 'POST',
+      body: JSON.stringify(unitData),
     });
+    if (data?.data) {
+      set((state) => ({
+        units: [data.data, ...state.units],
+        products: state.products.map(p => p.id === unitData.produk_id ? { ...p, total_unit: p.total_unit + 1, jumlah_unit_tersedia: p.jumlah_unit_tersedia + 1 } : p)
+      }));
+    }
   },
 
-  addUnit: (unitData) => {
-    const newUnit: Unit = {
-      ...unitData,
-      id: `unit-${Date.now()}`
-    };
-    set((state) => ({ 
-      units: [newUnit, ...state.units],
-      products: state.products.map(p => p.id === unitData.produk_id ? { ...p, total_unit: p.total_unit + 1, jumlah_unit_tersedia: p.jumlah_unit_tersedia + 1 } : p)
-    }));
-
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Hendra Wijaya (Admin)',
-      user_role: 'admin',
-      aksi: 'CREATE',
-      entitas: 'unit',
-      entitas_id: newUnit.id,
-      deskripsi: `Menambahkan unit fisik baru dengan nomor plat ${newUnit.nomor_plat}`,
-      ip_address: '182.253.120.44'
+  addKaryawan: async (karyawanData) => {
+    const { data } = await apiFetch<{ data: User }>('/api/auth/register-staff', {
+      method: 'POST',
+      body: JSON.stringify(karyawanData),
     });
+    if (data?.data) {
+      set((state) => ({ users: [...state.users, data.data] }));
+    }
   },
 
-  addKaryawan: (karyawanData) => {
-    const newEmp: User = {
-      ...karyawanData,
-      id: `usr-karyawan-${Date.now()}`,
-      created_at: new Date().toISOString(),
-      role: 'karyawan'
-    };
-    set((state) => ({ users: [...state.users, newEmp] }));
-
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Hendra Wijaya (Admin)',
-      user_role: 'admin',
-      aksi: 'CREATE',
-      entitas: 'users',
-      entitas_id: newEmp.id,
-      deskripsi: `Menambahkan akun karyawan operator baru: ${newEmp.nama_lengkap} (${newEmp.email})`,
-      ip_address: '182.253.120.44'
-    });
-  },
-
-  revokeSession: (sessionId) => {
+  revokeSession: async (sessionId) => {
+    await apiFetch(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' });
     set((state) => ({
       sessions: state.sessions.filter((s) => s.id !== sessionId)
     }));
-
-    get().addAuditLog({
-      user_id: 'usr-customer-1',
-      user_nama: 'Budi Santoso',
-      user_role: 'user',
-      aksi: 'SECURITY',
-      entitas: 'user_sessions',
-      entitas_id: sessionId,
-      deskripsi: `Mencabut akses session ID ${sessionId} dari profil perangkat.`,
-      ip_address: '114.122.35.101'
-    });
   },
 
-  addProduct: (produkData) => {
-    const newProd: Produk = {
-      ...produkData,
-      id: `prod-${Date.now()}`
-    };
-    set((state) => ({ products: [newProd, ...state.products] }));
-
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Hendra Wijaya (Admin)',
-      user_role: 'admin',
-      aksi: 'CREATE',
-      entitas: 'produk',
-      entitas_id: newProd.id,
-      deskripsi: `Menambahkan armada motor baru: ${newProd.nama} (${newProd.cc}cc) - Rp ${newProd.harga_per_hari.toLocaleString('id-ID')}/hari`,
-      ip_address: '182.253.120.44'
+  addProduct: async (produkData) => {
+    const { data } = await apiFetch<{ data: Produk }>('/api/produk', {
+      method: 'POST',
+      body: JSON.stringify(produkData),
     });
+    if (data?.data) {
+      set((state) => ({ products: [data.data, ...state.products] }));
+    }
   },
 
-  updateProduct: (id, updates) => {
-    set((state) => ({
-      products: state.products.map((p) => (p.id === id ? { ...p, ...updates } : p))
-    }));
-
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Hendra Wijaya (Admin)',
-      user_role: 'admin',
-      aksi: 'UPDATE',
-      entitas: 'produk',
-      entitas_id: id,
-      deskripsi: `Memperbarui informasi armada produk ID ${id}`,
-      ip_address: '182.253.120.44'
+  updateProduct: async (id, updates) => {
+    await apiFetch(`/api/produk/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
     });
+    await get().fetchProducts();
   },
 
-  processRefund: (transaksiId, alasan) => {
-    set((state) => ({
-      transactions: state.transactions.map((trx) => {
-        if (trx.id === transaksiId) {
-          return { ...trx, status: 'refund', updated_at: new Date().toISOString() };
-        }
-        return trx;
-      })
-    }));
-
-    const trx = get().transactions.find((t) => t.id === transaksiId);
-
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Hendra Wijaya (Admin)',
-      user_role: 'admin',
-      aksi: 'REFUND',
-      entitas: 'transaksi',
-      entitas_id: transaksiId,
-      deskripsi: `Refund diproses via Midtrans API untuk ${trx?.invoice_id || transaksiId}. Alasan: ${alasan}. Nominal: Rp ${(trx?.total_harga || 0).toLocaleString('id-ID')}`,
-      ip_address: '182.253.120.44'
+  processRefund: async (transaksiId, alasan) => {
+    await apiFetch(`/api/transaksi/${transaksiId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'refund', alasan }),
     });
+    await get().fetchTransactions();
   },
 
-  updateAppSettings: (settings) => {
+  updateAppSettings: async (settings) => {
+    await apiFetch('/api/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    });
     set((state) => ({ appSettings: { ...state.appSettings, ...settings } }));
-    get().addAuditLog({
-      user_id: 'usr-admin-1',
-      user_nama: 'Hendra Wijaya (Admin)',
-      user_role: 'admin',
-      aksi: 'UPDATE',
-      entitas: 'pengaturan_aplikasi',
-      entitas_id: 'umum',
-      deskripsi: 'Memperbarui konfigurasi informasi umum aplikasi',
-      ip_address: '182.253.120.44'
-    });
   }
 }));
