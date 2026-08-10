@@ -55,6 +55,12 @@ export async function POST(req: Request) {
 
     if (profileError) {
       console.error('Profile error:', profileError);
+      
+      // Check for duplicate key violation (23505)
+      if (profileError.code === '23505') {
+        return NextResponse.json({ error: 'Email sudah terdaftar. Silakan masuk (login).' }, { status: 400 });
+      }
+      
       return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 });
     }
 
