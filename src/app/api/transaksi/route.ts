@@ -59,6 +59,7 @@ export async function POST(req: Request) {
     const validatedData = createTransaksiSchema.safeParse(body);
     
     if (!validatedData.success) {
+      console.error('Validation error in /api/transaksi:', JSON.stringify(validatedData.error.format(), null, 2));
       return NextResponse.json({ error: 'Invalid input data', details: validatedData.error.format() }, { status: 400 });
     }
 
@@ -88,8 +89,8 @@ export async function POST(req: Request) {
     const randomDigits = Math.floor(1000 + Math.random() * 9000);
     const invoiceId = `INV-${todayStr}-${randomDigits}`;
 
-    const encryptedNik = encrypt(data.nik_penyewa);
-    const encryptedHp = encrypt(data.no_hp_penyewa);
+    const encryptedNik = data.nik_penyewa ? encrypt(data.nik_penyewa) : auth.profile.nik;
+    const encryptedHp = data.no_hp_penyewa ? encrypt(data.no_hp_penyewa) : auth.profile.no_hp;
 
     let status = 'pending';
     let snapToken = null;

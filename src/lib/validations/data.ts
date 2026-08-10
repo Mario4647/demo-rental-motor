@@ -21,13 +21,13 @@ export const createUnitSchema = z.object({
 export const createTransaksiSchema = z.object({
   produk_id: z.string().uuid('Invalid Product ID'),
   nama_penyewa: z.string().min(2, 'Name is required'),
-  no_hp_penyewa: z.string().min(10, 'Phone number is required'),
-  nik_penyewa: z.string().length(16, 'NIK must be 16 digits').regex(/^\d+$/, 'NIK must contain only numbers'),
+  no_hp_penyewa: z.string().optional(),
+  nik_penyewa: z.string().optional(),
   tanggal_mulai: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
   jam_mulai: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:MM)'),
   durasi_hari: z.number().int().positive('Duration must be positive'),
   metode_pembayaran: z.enum(['midtrans', 'cash']),
-  lokasi_pengambilan: z.string().min(5, 'Location is required'),
+  lokasi_pengambilan: z.string().optional(),
 });
 
 export const updateTransaksiStatusSchema = z.object({

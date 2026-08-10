@@ -8,8 +8,7 @@ import {
 } from 'lucide-react';
 
 export const ProfilView: React.FC = () => {
-  const { users, sessions, revokeSession } = useAppStore();
-  const currentUser = users.find((u) => u.role === 'user') || users[2];
+  const { currentUser, sessions, revokeSession } = useAppStore();
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -25,6 +24,10 @@ export const ProfilView: React.FC = () => {
     setOldPassword('');
     setNewPassword('');
   };
+
+  if (!currentUser) {
+    return <div className="flex items-center justify-center py-20 text-slate-400 text-sm">Memuat profil...</div>;
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-16">

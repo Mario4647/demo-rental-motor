@@ -139,6 +139,13 @@ export function RegisterPage({
           <p className="text-sm text-slate-500 mt-2">Bergabung dengan RentMoto untuk pengalaman rental motor terbaik</p>
         </div>
 
+        {errors.general && (
+          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-red-700 font-medium">{errors.general}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

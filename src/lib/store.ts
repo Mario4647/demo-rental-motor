@@ -83,8 +83,8 @@ interface AppState {
   createTransaction: (data: {
     produkId: string;
     namaPenyewa: string;
-    noHpPenyewa: string;
-    nikPenyewa: string;
+    noHpPenyewa?: string;
+    nikPenyewa?: string;
     tanggalMulai: string;
     jamMulai: string;
     durasiHari: number;
