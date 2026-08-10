@@ -144,6 +144,8 @@ export interface AuthUser {
   id: string;
   email: string;
   nama_lengkap: string;
+  nik?: string;
+  no_hp?: string;
   role: Role;
   avatar_url?: string;
   is_active: boolean;

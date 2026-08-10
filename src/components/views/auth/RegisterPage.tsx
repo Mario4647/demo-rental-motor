@@ -100,7 +100,7 @@ export function RegisterPage({
     } catch (err: any) {
       if (err instanceof z.ZodError) {
         const newErrors: any = {};
-        const errorsList = err.issues || err.errors || [];
+        const errorsList = (err as any).issues || (err as any).errors || [];
         errorsList.forEach((e: any) => {
           if (e.path && e.path[0]) {
             // Map backend schema field names back to frontend state names for error display

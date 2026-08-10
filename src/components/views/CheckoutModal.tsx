@@ -53,7 +53,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ product, onClose, 
     const newTrx = await createTransaction({
       produkId: product.id,
       namaPenyewa: currentUser.nama_lengkap,
-      noHpPenyewa: currentUser.no_hp,
+      noHpPenyewa: currentUser.no_hp || '',
       nikPenyewa: currentUser.nik || '',
       tanggalMulai,
       jamMulai,
